@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Linq;
 using Telegram.Td.Api;
-using Unigram.Common;
-using Unigram.Entities;
 using Unigram.ViewModels;
 using Windows.Foundation;
 using Windows.UI.Xaml;
@@ -50,7 +48,7 @@ namespace Unigram.Controls
                 ttl = viewModel.Ttl > 0;
                 constraint = viewModel.Content;
 
-                if (viewModel.MediaAlbumId != 0 && Tag is GroupedMessagePosition)
+                if (viewModel.MediaAlbumId != 0 && Tag is true)
                 {
                     return base.MeasureOverride(availableSize);
                 }
@@ -60,7 +58,7 @@ namespace Unigram.Controls
                 ttl = message.Ttl > 0;
                 constraint = message.Content;
 
-                if (message.MediaAlbumId != 0 && Tag is GroupedMessagePosition)
+                if (message.MediaAlbumId != 0 && Tag is true)
                 {
                     return base.MeasureOverride(availableSize);
                 }
@@ -207,9 +205,9 @@ namespace Unigram.Controls
                     constraint = photo.Sizes.OrderByDescending(x => x.Width).FirstOrDefault();
                 }
             }
-            else if (constraint is UserProfilePhoto userProfilePhoto)
+            else if (constraint is ChatPhoto chatPhoto)
             {
-                constraint = userProfilePhoto.Sizes.OrderByDescending(x => x.Width).FirstOrDefault();
+                constraint = chatPhoto.Sizes.OrderByDescending(x => x.Width).FirstOrDefault();
             }
             else if (constraint is Sticker sticker)
             {

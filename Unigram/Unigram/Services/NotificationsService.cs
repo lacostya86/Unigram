@@ -44,6 +44,7 @@ namespace Unigram.Services
         IHandle<UpdateUnreadMessageCount>,
         IHandle<UpdateUnreadChatCount>,
         IHandle<UpdateChatReadInbox>,
+        IHandle<UpdateSuggestedActions>,
         IHandle<UpdateServiceNotification>,
         IHandle<UpdateTermsOfService>,
         IHandle<UpdateAuthorizationState>,
@@ -144,6 +145,23 @@ namespace Unigram.Services
 
                     _protoService.Send(new AcceptTermsOfService(update.TermsOfServiceId));
                 });
+            }
+        }
+
+        public async void Handle(UpdateSuggestedActions update)
+        {
+            foreach (var action in update.AddedActions)
+            {
+                if (action is SuggestedActionEnableArchiveAndMuteNewChats)
+                {
+                    var confirm = await MessagePopup.ShowAsync(Strings.Resources.HideNewChatsAlertText, Strings.Resources.HideNewChatsAlertTitle, Strings.Resources.OK, Strings.Resources.Cancel);
+                    if (confirm == ContentDialogResult.Primary)
+                    {
+                        _protoService.Options.ArchiveAndMuteNewChatsFromUnknownUsers = true;
+                    }
+
+                    _protoService.Send(new HideSuggestedAction(action));
+                }
             }
         }
 
@@ -656,8 +674,8 @@ namespace Unigram.Services
                     var formatted = Client.Execute(new ParseMarkdown(new FormattedText(messageText, new TextEntity[0]))) as FormattedText;
 
                     var replyToMsgId = data.ContainsKey("msg_id") ? long.Parse(data["msg_id"]) << 20 : 0;
-                    var response = await _protoService.SendAsync(new SendMessage(chat.Id, replyToMsgId, new SendMessageOptions(false, true, null), null, new InputMessageText(formatted, false, false)));
-                
+                    var response = await _protoService.SendAsync(new SendMessage(chat.Id, replyToMsgId, new MessageSendOptions(false, true, null), null, new InputMessageText(formatted, false, false)));
+
                     if (chat.Type is ChatTypePrivate)
                     {
                         await _protoService.SendAsync(new ViewMessages(chat.Id, new long[] { chat.LastMessage.Id }, true));
@@ -879,10 +897,7 @@ namespace Unigram.Services
             }
             else if (message.Content is MessageCall call)
             {
-                var outgoing = message.IsOutgoing;
-                var missed = call.DiscardReason is CallDiscardReasonMissed || call.DiscardReason is CallDiscardReasonDeclined;
-
-                return result + (missed ? (outgoing ? Strings.Resources.CallMessageOutgoingMissed : Strings.Resources.CallMessageIncomingMissed) : (outgoing ? Strings.Resources.CallMessageOutgoing : Strings.Resources.CallMessageIncoming));
+                return result + call.ToOutcomeText(message.IsOutgoing);
             }
             else if (message.Content is MessageUnsupported)
             {

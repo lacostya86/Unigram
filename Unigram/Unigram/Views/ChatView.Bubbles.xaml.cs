@@ -11,6 +11,7 @@ using Unigram.Controls.Messages;
 using Unigram.Converters;
 using Unigram.Services;
 using Unigram.ViewModels;
+using Unigram.ViewModels.Chats;
 using Unigram.ViewModels.Gallery;
 using Windows.Foundation;
 using Windows.UI.Core;
@@ -45,7 +46,7 @@ namespace Unigram.Views
                 Arrow.Visibility = Visibility.Collapsed;
                 //VisualUtilities.SetIsVisible(Arrow, false);
             }
-            else
+            else if (ViewModel.Type == DialogType.Normal)
             {
                 Arrow.Visibility = Visibility.Visible;
                 //VisualUtilities.SetIsVisible(Arrow, true);
@@ -93,7 +94,7 @@ namespace Unigram.Views
 
                 if (message.Content is MessageAlbum album)
                 {
-                    messages.AddRange(album.Layout.Messages.Keys);
+                    messages.AddRange(album.Messages.Keys);
                 }
                 else if (message.SendingState is MessageSendingStatePending == false)
                 {
@@ -338,7 +339,16 @@ namespace Unigram.Views
             {
                 if (_old.TryGetValue(message.Id, out MediaPlayerItem item))
                 {
-                    var viewModel = new SingleGalleryViewModel(ViewModel.ProtoService, ViewModel.Aggregator, new GalleryMessage(ViewModel.ProtoService, message.Get()));
+                    GalleryViewModelBase viewModel;
+                    if (message.Content is MessageAnimation)
+                    {
+                        viewModel = new ChatGalleryViewModel(ViewModel.ProtoService, ViewModel.Aggregator, message.ChatId, message.Get());
+                    }
+                    else
+                    {
+                        viewModel = new SingleGalleryViewModel(ViewModel.ProtoService, ViewModel.Aggregator, new GalleryMessage(ViewModel.ProtoService, message.Get()));
+                    }
+
                     await GalleryView.GetForCurrentView().ShowAsync(viewModel, () => target);
                 }
                 else
@@ -750,12 +760,20 @@ namespace Unigram.Views
                             photo.Source = PlaceholderHelper.GetNameForUser(fromHiddenUser.SenderName, 30);
                         }
                     }
-                    else
+                    else if (message.SenderUserId != 0)
                     {
                         var user = message.GetSenderUser();
                         if (user != null)
                         {
                             photo.Source = PlaceholderHelper.GetUser(ViewModel.ProtoService, user, 30);
+                        }
+                    }
+                    else
+                    {
+                        var chat = message.GetChat();
+                        if (chat != null)
+                        {
+                            photo.Source = PlaceholderHelper.GetChat(ViewModel.ProtoService, chat, 30);
                         }
                     }
                 }
@@ -801,7 +819,7 @@ namespace Unigram.Views
 
                 if (message.Content is MessageChatChangePhoto chatChangePhoto)
                 {
-                    var photo = panel.FindName("Photo") as ProfilePicture;
+                    var photo = panel.FindName("Photo") as Image;
                     if (photo != null)
                     {
                         var file = chatChangePhoto.Photo.GetSmall();
@@ -809,7 +827,7 @@ namespace Unigram.Views
                         {
                             if (file.Photo.Local.IsDownloadingCompleted)
                             {
-                                photo.Source = new BitmapImage(new Uri("file:///" + file.Photo.Local.Path)) { DecodePixelWidth = 96, DecodePixelHeight = 96, DecodePixelType = DecodePixelType.Logical };
+                                photo.Source = new BitmapImage(new Uri("file:///" + file.Photo.Local.Path)) { DecodePixelWidth = 120, DecodePixelHeight = 120, DecodePixelType = DecodePixelType.Logical };
                             }
                             else if (file.Photo.Local.CanBeDownloaded && !file.Photo.Local.IsDownloadingActive)
                             {

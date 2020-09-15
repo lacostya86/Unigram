@@ -15,7 +15,6 @@ using Unigram.ViewModels.Delegates;
 using Unigram.ViewModels.Gallery;
 using Unigram.Views;
 using Unigram.Views.Popups;
-using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -226,7 +225,10 @@ namespace Unigram.ViewModels
 
         public async void OpenReply(MessageViewModel message)
         {
-            await LoadMessageSliceAsync(message.Id, message.ReplyToMessageId);
+            if (message.ReplyToMessageState == ReplyToMessageState.None)
+            {
+                await LoadMessageSliceAsync(message.Id, message.ReplyToMessageId);
+            }
         }
 
 
@@ -303,9 +305,9 @@ namespace Unigram.ViewModels
             KeyboardButtonExecute(message, button);
         }
 
-        public void Call(MessageViewModel message)
+        public void Call(MessageViewModel message, bool video)
         {
-            CallCommand.Execute();
+            CallCommand.Execute(video);
         }
 
         public async void VotePoll(MessageViewModel message, IList<PollOption> options)
@@ -501,14 +503,14 @@ namespace Unigram.ViewModels
             else if (message.Content is MessageGame game && message.ReplyMarkup is ReplyMarkupInlineKeyboard inline)
             {
                 foreach (var row in inline.Rows)
-                foreach (var button in row)
-                {
-                    if (button.Type is InlineKeyboardButtonTypeCallbackGame)
+                    foreach (var button in row)
                     {
-                        KeyboardButtonExecute(message, button);
-                        return;
+                        if (button.Type is InlineKeyboardButtonTypeCallbackGame)
+                        {
+                            KeyboardButtonExecute(message, button);
+                            return;
+                        }
                     }
-                }
             }
 
             GalleryViewModelBase viewModel = null;
@@ -532,7 +534,7 @@ namespace Unigram.ViewModels
             {
                 if (viewModel == null)
                 {
-                    if ((message.Content is MessagePhoto || message.Content is MessageVideo) && !message.IsSecret())
+                    if ((message.Content is MessageAnimation || message.Content is MessagePhoto || message.Content is MessageVideo) && !message.IsSecret())
                     {
                         viewModel = new ChatGalleryViewModel(ProtoService, Aggregator, message.ChatId, message.Get());
                     }

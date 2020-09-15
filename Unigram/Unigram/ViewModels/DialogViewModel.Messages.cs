@@ -9,7 +9,6 @@ using Telegram.Td.Api;
 using Unigram.Common;
 using Unigram.Controls;
 using Unigram.Converters;
-using Unigram.Services;
 using Unigram.Views;
 using Unigram.Views.Payments;
 using Unigram.Views.Popups;
@@ -83,7 +82,7 @@ namespace Unigram.ViewModels
 
             if (message.Content is MessageAlbum album)
             {
-                message = album.Layout.Messages.FirstOrDefault();
+                message = album.Messages.FirstOrDefault();
             }
 
             ComposerHeader = new MessageComposerHeader { ReplyToMessage = message };
@@ -209,7 +208,7 @@ namespace Unigram.ViewModels
         {
             if (message.Content is MessageAlbum album)
             {
-                await SharePopup.GetForCurrentView().ShowAsync(album.Layout.Messages.Select(x => x.Get()).ToList());
+                await SharePopup.GetForCurrentView().ShowAsync(album.Messages.Select(x => x.Get()).ToList());
             }
             else
             {
@@ -901,7 +900,7 @@ namespace Unigram.ViewModels
         public RelayCommand<MessageViewModel> MessageRescheduleCommand { get; }
         private async void MessageRescheduleExecute(MessageViewModel message)
         {
-            var options = await PickSendMessageOptionsAsync(true);
+            var options = await PickMessageSendOptionsAsync(true);
             if (options?.SchedulingState == null)
             {
                 return;

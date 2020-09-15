@@ -72,7 +72,13 @@ namespace Unigram.Views
                     return;
                 }
 
-                var viewModel = new UserPhotosViewModel(ViewModel.ProtoService, ViewModel.Aggregator, user);
+                var userFull = ViewModel.ProtoService.GetUserFull(user.Id);
+                if (userFull == null)
+                {
+                    return;
+                }
+
+                var viewModel = new UserPhotosViewModel(ViewModel.ProtoService, ViewModel.Aggregator, user, userFull);
                 await GalleryView.GetForCurrentView().ShowAsync(viewModel, () => Photo);
             }
             else if (chat.Type is ChatTypeBasicGroup || chat.Type is ChatTypeSupergroup)
@@ -108,6 +114,7 @@ namespace Unigram.Views
             NotificationGlyph.Text = unmuted ? Icons.Unmute : Icons.Mute;
 
             Call.Visibility = Visibility.Collapsed;
+            VideoCall.Visibility = Visibility.Collapsed;
         }
 
         public void UpdateChatTitle(Chat chat)
@@ -219,6 +226,8 @@ namespace Unigram.Views
             }
 
             Call.Visibility = fullInfo.CanBeCalled ? Visibility.Visible : Visibility.Collapsed;
+            VideoCall.Visibility = fullInfo.SupportsVideoCalls ? Visibility.Visible : Visibility.Collapsed;
+
             Edit.Visibility = Visibility.Collapsed;
         }
 
@@ -265,6 +274,7 @@ namespace Unigram.Views
 
             // Unused:
             Call.Visibility = Visibility.Collapsed;
+            VideoCall.Visibility = Visibility.Collapsed;
 
             Verified.Visibility = Visibility.Collapsed;
             UserPhone.Visibility = Visibility.Collapsed;
@@ -312,6 +322,8 @@ namespace Unigram.Views
             Automation.SetToolTip(Edit, group.IsChannel ? Strings.Resources.ManageChannelMenu : Strings.Resources.ManageGroupMenu);
 
             Call.Visibility = Visibility.Collapsed;
+            VideoCall.Visibility = Visibility.Collapsed;
+
             Edit.Visibility = group.Status is ChatMemberStatusCreator || group.Status is ChatMemberStatusAdministrator ? Visibility.Visible : Visibility.Collapsed;
             Edit.Glyph = Icons.Edit;
 
@@ -571,14 +583,12 @@ namespace Unigram.Views
 
                 var fullInfo = ViewModel.ProtoService.GetSupergroupFull(super.SupergroupId);
 
-                if (super.IsChannel)
+                if (fullInfo != null && fullInfo.CanViewStatistics)
                 {
-                    if (fullInfo != null && fullInfo.CanViewStatistics)
-                    {
-                        flyout.CreateFlyoutItem(ViewModel.StatisticsCommand, Strings.Resources.Statistics, new FontIcon { Glyph = Icons.Statistics });
-                    }
+                    flyout.CreateFlyoutItem(ViewModel.StatisticsCommand, Strings.Resources.Statistics, new FontIcon { Glyph = Icons.Statistics });
                 }
-                else
+
+                if (!super.IsChannel)
                 {
                     flyout.CreateFlyoutItem(ViewModel.MembersCommand, Strings.Resources.SearchMembers, new FontIcon { Glyph = Icons.Search });
 

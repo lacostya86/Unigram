@@ -1,5 +1,4 @@
 ﻿using Unigram.Native;
-using Windows.ApplicationModel.Resources.Core;
 using Windows.Foundation.Metadata;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Media.Animation;
@@ -45,7 +44,7 @@ namespace Unigram.Common
         private static FlowDirection LoadFlowDirection()
         {
 #if DEBUG
-            var flowDirectionSetting = ResourceContext.GetForCurrentView().QualifierValues["LayoutDirection"];
+            var flowDirectionSetting = Windows.ApplicationModel.Resources.Core.ResourceContext.GetForCurrentView().QualifierValues["LayoutDirection"];
             return flowDirectionSetting == "RTL" ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
 #else
             return FlowDirection.LeftToRight;

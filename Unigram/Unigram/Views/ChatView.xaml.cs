@@ -506,7 +506,7 @@ namespace Unigram.Views
         }
 
         public void Activate()
-        { 
+        {
             DataContext = _getViewModel(this);
             Bindings.Update();
 
@@ -801,7 +801,13 @@ namespace Unigram.Views
                     return;
                 }
 
-                var viewModel = new UserPhotosViewModel(ViewModel.ProtoService, ViewModel.Aggregator, user);
+                var userFull = ViewModel.ProtoService.GetUserFull(user.Id);
+                if (userFull == null)
+                {
+                    return;
+                }
+
+                var viewModel = new UserPhotosViewModel(ViewModel.ProtoService, ViewModel.Aggregator, user, userFull);
                 await GalleryView.GetForCurrentView().ShowAsync(viewModel, () => Photo);
             }
             else if (chat.Type is ChatTypeBasicGroup || chat.Type is ChatTypeSupergroup)
@@ -874,7 +880,7 @@ namespace Unigram.Views
 
         private void Window_Activated(object sender, WindowActivatedEventArgs e)
         {
-            if (e.WindowActivationState != CoreWindowActivationState.Deactivated)
+            if (Window.Current.CoreWindow.ActivationMode == CoreWindowActivationMode.ActivatedInForeground)
             {
                 ViewVisibleMessages(false);
                 StickersPanel.LoadVisibleItems();
@@ -1965,7 +1971,7 @@ namespace Unigram.Views
                     }
                     else
                     {
-                        message = album.Layout.Messages.FirstOrDefault() ?? message;
+                        message = album.Messages.FirstOrDefault() ?? message;
                     }
                 }
             }
@@ -3069,6 +3075,7 @@ namespace Unigram.Views
             ButtonSilent.IsChecked = chat.DefaultDisableNotification;
 
             Call.Visibility = Visibility.Collapsed;
+            VideoCall.Visibility = Visibility.Collapsed;
 
             UpdateChatPermissions(chat);
         }
@@ -3717,13 +3724,15 @@ namespace Unigram.Views
 
             if (radius > 0)
             {
-                TextArea.MaxWidth = ChatFooter.MaxWidth = SettingsService.Current.IsAdaptiveWideEnabled ? 640 : double.PositiveInfinity;
+                TextArea.MaxWidth = ChatFooter.MaxWidth = InlinePanel.MaxWidth = Separator.MaxWidth =
+                    SettingsService.Current.IsAdaptiveWideEnabled ? 640 : double.PositiveInfinity;
                 TextArea.Margin = ChatFooter.Margin = new Thickness(12, 0, 12, 8);
                 InlinePanel.Margin = new Thickness(12, 0, 12, -radius);
             }
             else
             {
-                TextArea.MaxWidth = ChatFooter.MaxWidth = SettingsService.Current.IsAdaptiveWideEnabled ? 664 : double.PositiveInfinity;
+                TextArea.MaxWidth = ChatFooter.MaxWidth = InlinePanel.MaxWidth = Separator.MaxWidth =
+                    SettingsService.Current.IsAdaptiveWideEnabled ? 664 : double.PositiveInfinity;
                 TextArea.Margin = ChatFooter.Margin = new Thickness();
                 InlinePanel.Margin = new Thickness();
             }
@@ -3802,6 +3811,7 @@ namespace Unigram.Views
             }
 
             Call.Visibility = /*!secret &&*/ fullInfo.CanBeCalled ? Visibility.Visible : Visibility.Collapsed;
+            VideoCall.Visibility = /*!secret &&*/ fullInfo.SupportsVideoCalls ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public void UpdateUserStatus(Chat chat, User user)
@@ -3845,7 +3855,7 @@ namespace Unigram.Views
 
         public void UpdateBasicGroup(Chat chat, BasicGroup group)
         {
-            if (group.Status is ChatMemberStatusLeft)
+            if (group.Status is ChatMemberStatusLeft || group.Status is ChatMemberStatusBanned)
             {
                 ShowAction(Strings.Resources.DeleteThisGroup, true);
 
@@ -3901,7 +3911,7 @@ namespace Unigram.Views
                 DiscussButton.Visibility = Visibility.Collapsed;
                 return;
             }
-            
+
             if (group.IsChannel)
             {
                 if ((group.Status is ChatMemberStatusLeft && group.Username.Length > 0) || (group.Status is ChatMemberStatusCreator creator && !creator.IsMember))
@@ -4093,10 +4103,10 @@ namespace Unigram.Views
                     }
                     else if (message.Content is MessageChatChangePhoto && file.Local.IsDownloadingCompleted)
                     {
-                        var photo = element.FindName("Photo") as ProfilePicture;
+                        var photo = element.FindName("Photo") as Image;
                         if (photo != null)
                         {
-                            photo.Source = new BitmapImage(new Uri("file:///" + file.Local.Path)) { DecodePixelWidth = 96, DecodePixelHeight = 96, DecodePixelType = DecodePixelType.Logical };
+                            photo.Source = new BitmapImage(new Uri("file:///" + file.Local.Path)) { DecodePixelWidth = 120, DecodePixelHeight = 120, DecodePixelType = DecodePixelType.Logical };
                         }
                     }
 
@@ -4167,12 +4177,20 @@ namespace Unigram.Views
                                     }
                                 }
                             }
-                            else
+                            else if (message.SenderUserId != 0)
                             {
                                 var user = message.GetSenderUser();
                                 if (user != null)
                                 {
-                                    photo.Source = PlaceholderHelper.GetUser(null, user, 32);
+                                    photo.Source = PlaceholderHelper.GetUser(null, user, 30);
+                                }
+                            }
+                            else
+                            {
+                                var chat2 = message.GetChat();
+                                if (chat2 != null)
+                                {
+                                    photo.Source = PlaceholderHelper.GetChat(null, chat2, 30);
                                 }
                             }
                         }

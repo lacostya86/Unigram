@@ -158,6 +158,10 @@ namespace Unigram.ViewModels
         public bool IsShareable()
         {
             var message = this;
+            if (message.SchedulingState != null)
+            {
+                return false;
+            }
             //if (currentPosition != null && !currentPosition.last)
             //{
             //    return false;
@@ -270,7 +274,7 @@ namespace Unigram.ViewModels
             {
                 FormattedText caption = null;
 
-                foreach (var child in album.Layout.Messages)
+                foreach (var child in album.Messages)
                 {
                     var childCaption = child.Content?.GetCaption();
                     if (childCaption != null && !string.IsNullOrEmpty(childCaption.Text))

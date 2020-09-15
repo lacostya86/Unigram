@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Telegram.Td.Api;
@@ -655,7 +654,7 @@ namespace Unigram.Controls.Chats
         {
             Sending?.Invoke(this, EventArgs.Empty);
 
-            var options = new SendMessageOptions(disableNotification, false, null);
+            var options = new MessageSendOptions(disableNotification, false, null);
 
             var text = GetFormattedText(true);
             await ViewModel.SendMessageAsync(text, options);
@@ -665,7 +664,7 @@ namespace Unigram.Controls.Chats
         {
             Sending?.Invoke(this, EventArgs.Empty);
 
-            var options = await ViewModel.PickSendMessageOptionsAsync(true);
+            var options = await ViewModel.PickMessageSendOptionsAsync(true);
             if (options == null)
             {
                 return;
@@ -862,7 +861,7 @@ namespace Unigram.Controls.Chats
                 }
                 else
                 {
-                    if (!MessageHelper.IsValidCommandSymbol(text[i]))
+                    if (!char.IsLetter(text[i]))
                     {
                         flag = false;
                         break;

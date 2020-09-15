@@ -56,9 +56,9 @@ namespace Unigram.ViewModels
                 {
                     messages.RemoveAt(i);
 
-                    for (int j = 0; j < album.Layout.Messages.Count; j++)
+                    for (int j = 0; j < album.Messages.Count; j++)
                     {
-                        messages.Insert(i, album.Layout.Messages[j]);
+                        messages.Insert(i, album.Messages[j]);
                         i++;
                     }
 
@@ -82,7 +82,7 @@ namespace Unigram.ViewModels
         protected readonly ILocationService _locationService;
         protected readonly INotificationsService _pushService;
         protected readonly IPlaybackService _playbackService;
-        protected readonly IVoIPService _voipService;
+        protected readonly IVoipService _voipService;
         protected readonly INetworkService _networkService;
         protected readonly IMessageFactory _messageFactory;
 
@@ -92,7 +92,7 @@ namespace Unigram.ViewModels
 
         public IDialogDelegate Delegate { get; set; }
 
-        public DialogViewModel(IProtoService protoService, ICacheService cacheService, ISettingsService settingsService, IEventAggregator aggregator, ILocationService locationService, INotificationsService pushService, IPlaybackService playbackService, IVoIPService voipService, INetworkService networkService, IMessageFactory messageFactory)
+        public DialogViewModel(IProtoService protoService, ICacheService cacheService, ISettingsService settingsService, IEventAggregator aggregator, ILocationService locationService, INotificationsService pushService, IPlaybackService playbackService, IVoipService voipService, INetworkService networkService, IMessageFactory messageFactory)
             : base(protoService, cacheService, settingsService, aggregator)
         {
             _locationService = locationService;
@@ -120,7 +120,7 @@ namespace Unigram.ViewModels
             OpenStickersCommand = new RelayCommand(OpenStickersExecute);
             ChatDeleteCommand = new RelayCommand(ChatDeleteExecute);
             ChatClearCommand = new RelayCommand(ChatClearExecute);
-            CallCommand = new RelayCommand(CallExecute);
+            CallCommand = new RelayCommand<bool>(CallExecute);
             UnpinMessageCommand = new RelayCommand(UnpinMessageExecute);
             UnblockCommand = new RelayCommand(UnblockExecute);
             ShareContactCommand = new RelayCommand(ShareContactExecute);
@@ -541,7 +541,7 @@ namespace Unigram.ViewModels
             var last = Items.LastOrDefault();
             if (last?.Content is MessageAlbum album)
             {
-                last = album.Layout.Messages.LastOrDefault();
+                last = album.Messages.LastOrDefault();
             }
 
             if (last == null || last.Id == 0)
@@ -1004,7 +1004,7 @@ namespace Unigram.ViewModels
                 pixel = int.MaxValue;
             }
 
-            var already = Items.FirstOrDefault(x => x.Id == maxId || x.Content is MessageAlbum album && album.Layout.Messages.ContainsKey(maxId));
+            var already = Items.FirstOrDefault(x => x.Id == maxId || x.Content is MessageAlbum album && album.Messages.ContainsKey(maxId));
             if (already != null)
             {
                 var field = ListField;
@@ -1330,7 +1330,7 @@ namespace Unigram.ViewModels
 
                 if (content is MessageAlbum albumMessage)
                 {
-                    ProcessFiles(chat, albumMessage.Layout.Messages, message);
+                    ProcessFiles(chat, albumMessage.Messages, message);
                     continue;
                 }
 
@@ -1527,7 +1527,7 @@ namespace Unigram.ViewModels
 
         private void ProcessAlbums(Chat chat, IList<MessageViewModel> slice)
         {
-            var groups = new Dictionary<long, Tuple<MessageViewModel, GroupedMessages>>();
+            var groups = new Dictionary<long, Tuple<MessageViewModel, MessageAlbum>>();
             var newGroups = new Dictionary<long, long>();
 
             for (int i = 0; i < slice.Count; i++)
@@ -1565,12 +1565,11 @@ namespace Unigram.ViewModels
 
                 if (group.Content is MessageAlbum album)
                 {
-                    groups[groupedId] = Tuple.Create(group, album.Layout);
+                    groups[groupedId] = Tuple.Create(group, album);
 
-                    album.Layout.GroupedId = groupedId;
-                    album.Layout.Messages.Add(message);
+                    album.Messages.Add(message);
 
-                    var first = album.Layout.Messages.FirstOrDefault();
+                    var first = album.Messages.FirstOrDefault();
                     if (first != null)
                     {
                         group.UpdateWith(first);
@@ -1580,7 +1579,7 @@ namespace Unigram.ViewModels
 
             foreach (var group in groups.Values)
             {
-                group.Item2.Calculate();
+                group.Item2.Invalidate();
 
                 if (newGroups.ContainsKey(group.Item1.MediaAlbumId))
                 {
@@ -2329,12 +2328,12 @@ namespace Unigram.ViewModels
             await SendMessageAsync(args);
         }
 
-        public Task SendMessageAsync(FormattedText formattedText, SendMessageOptions options = null)
+        public Task SendMessageAsync(FormattedText formattedText, MessageSendOptions options = null)
         {
             return SendMessageAsync(formattedText.Text, formattedText.Entities, options);
         }
 
-        public async Task SendMessageAsync(string text, IList<TextEntity> entities = null, SendMessageOptions options = null)
+        public async Task SendMessageAsync(string text, IList<TextEntity> entities = null, MessageSendOptions options = null)
         {
             text = text.Replace('\v', '\n').Replace('\r', '\n');
 
@@ -2356,7 +2355,7 @@ namespace Unigram.ViewModels
 
             if (options == null)
             {
-                options = await PickSendMessageOptionsAsync();
+                options = await PickMessageSendOptionsAsync();
             }
 
             if (options == null)
@@ -2696,80 +2695,16 @@ namespace Unigram.ViewModels
 
         #region Call
 
-        public RelayCommand CallCommand { get; }
-        private async void CallExecute()
+        public RelayCommand<bool> CallCommand { get; }
+        private void CallExecute(bool video)
         {
-            //var user = With as TLUser;
-            //if (user == null)
-            //{
-            //    return;
-            //}
-
-            //try
-            //{
-            //    var coordinator = VoipCallCoordinator.GetDefault();
-            //    var result = await coordinator.ReserveCallResourcesAsync("Unigram.Tasks.VoIPCallTask");
-            //    if (result == VoipPhoneCallResourceReservationStatus.Success)
-            //    {
-            //        await VoIPConnection.Current.SendRequestAsync("voip.startCall", user);
-            //    }
-            //}
-            //catch
-            //{
-            //    await MessagePopup.ShowAsync("Something went wrong. Please, try to close and relaunch the app.", "Unigram", "OK");
-            //}
-
             var chat = _chat;
             if (chat == null)
             {
                 return;
             }
 
-            var user = CacheService.GetUser(chat);
-            if (user == null)
-            {
-                return;
-            }
-
-            var call = _voipService.ActiveCall;
-            if (call != null)
-            {
-                var callUser = CacheService.GetUser(call.UserId);
-                if (callUser != null && callUser.Id != user.Id)
-                {
-                    var confirm = await MessagePopup.ShowAsync(string.Format(Strings.Resources.VoipOngoingAlert, callUser.GetFullName(), user.GetFullName()), Strings.Resources.VoipOngoingAlertTitle, Strings.Resources.OK, Strings.Resources.Cancel);
-                    if (confirm == ContentDialogResult.Primary)
-                    {
-
-                    }
-                }
-                else
-                {
-                    _voipService.Show();
-                }
-
-                return;
-            }
-
-            var fullInfo = CacheService.GetUserFull(user.Id);
-            if (fullInfo != null && fullInfo.HasPrivateCalls)
-            {
-                await MessagePopup.ShowAsync(string.Format(Strings.Resources.CallNotAvailable, user.GetFullName()), Strings.Resources.VoipFailed, Strings.Resources.OK);
-                return;
-            }
-
-            var response = await ProtoService.SendAsync(new CreateCall(user.Id, new CallProtocol(true, true, 65, libtgvoip.VoIPControllerWrapper.GetConnectionMaxLayer(), new string[0])));
-            if (response is Error error)
-            {
-                if (error.Code == 400 && error.Message.Equals("PARTICIPANT_VERSION_OUTDATED"))
-                {
-                    await MessagePopup.ShowAsync(string.Format(Strings.Resources.VoipPeerOutdated, user.GetFullName()), Strings.Resources.AppName, Strings.Resources.OK);
-                }
-                else if (error.Code == 400 && error.Message.Equals("USER_PRIVACY_RESTRICTED"))
-                {
-                    await MessagePopup.ShowAsync(string.Format(Strings.Resources.CallNotAvailable, user.GetFullName()), Strings.Resources.AppName, Strings.Resources.OK);
-                }
-            }
+            _voipService.Start(chat.Id, video);
         }
 
         #endregion
@@ -3217,7 +3152,7 @@ namespace Unigram.ViewModels
                     return;
                 }
 
-                if (group.Status is ChatMemberStatusLeft)
+                if (group.Status is ChatMemberStatusLeft || group.Status is ChatMemberStatusBanned)
                 {
                     // Delete and exit
                     ChatDeleteExecute();
